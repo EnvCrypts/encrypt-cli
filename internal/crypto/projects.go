@@ -7,7 +7,9 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"io"
+	"log"
 
 	"golang.org/x/crypto/hkdf"
 )
@@ -149,6 +151,18 @@ func UnwrapPMK(
 		return nil, errors.New("invalid user private key length")
 	}
 
+	fmt.Printf("EphemeralPub (%d): %x\n", len(wrapped.WrapEphemeralPub), wrapped.WrapEphemeralPub)
+	fmt.Printf("UserPriv (%d): %x\n", len(userPrivateKey), userPrivateKey)
+
+	sharedSecret, _ := X25519SharedSecret(userPrivateKey, wrapped.WrapEphemeralPub)
+	fmt.Printf("SharedSecret (%d): %x\n", len(sharedSecret), sharedSecret)
+
+	wrapKey, _ := DeriveWrapKey(sharedSecret)
+	fmt.Printf("WrapKey (%d): %x\n", len(wrapKey), wrapKey)
+
+	fmt.Printf("Nonce (%d): %x\n", len(wrapped.WrapNonce), wrapped.WrapNonce)
+	fmt.Printf("Ciphertext (%d): %x\n", len(wrapped.WrappedPMK), wrapped.WrappedPMK)
+
 	// 1. Derive shared secret
 	sharedSecret, err := X25519SharedSecret(
 		userPrivateKey,
@@ -159,7 +173,7 @@ func UnwrapPMK(
 	}
 
 	// 2. Derive wrap key
-	wrapKey, err := DeriveWrapKey(sharedSecret)
+	wrapKey, err = DeriveWrapKey(sharedSecret)
 	if err != nil {
 		return nil, err
 	}
@@ -186,6 +200,38 @@ func UnwrapPMK(
 	}
 
 	return pmk, nil
+}
+
+func EncryptENV(pmk []byte, data []byte) ([]byte, []byte, error) {
+	block, err := aes.NewCipher(pmk)
+	if err != nil {
+		return nil, nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	nonce := make([]byte, gcm.NonceSize())
+	rand.Read(nonce)
+
+	return gcm.Seal(nil, nonce, data, nil), nonce, nil
+}
+
+func DecryptENV(pmk []byte, encryptedData []byte, nonce []byte) ([]byte, error) {
+
+	log.Print(len(nonce))
+
+	block, err := aes.NewCipher(pmk)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	return gcm.Open(nil, nonce, encryptedData, nil)
 }
 
 func zero(b []byte) {

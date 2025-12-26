@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 
 	cryptutils "github.com/envcrypts/envcrypt_cli/internal/crypto"
@@ -46,9 +45,7 @@ func Register(email, password string) error {
 	if err != nil {
 		return err
 	}
-
-	log.Println("PrivateKey:", keypair.PrivateKey)
-
+	
 	var RequestBody = CreateRequestBody{
 		Email:                   email,
 		Password:                password,

@@ -42,6 +42,8 @@ func CreateProject(name string, userId uuid.UUID, publicKey []byte) error {
 		EphemeralPublicKey: wrappedKey.WrapEphemeralPub,
 	}
 
+	log.Print(projectRequest)
+
 	requestBody, err := json.Marshal(projectRequest)
 	if err != nil {
 		return err
@@ -54,4 +56,50 @@ func CreateProject(name string, userId uuid.UUID, publicKey []byte) error {
 	defer resp.Body.Close()
 
 	return nil
+}
+
+type GetUserProjectRequest struct {
+	ProjectName string    `json:"project_name"`
+	UserId      uuid.UUID `json:"user_id"`
+}
+type GetUserProjectResponse struct {
+	ProjectId          uuid.UUID `json:"project_id"`
+	WrappedPMK         []byte    `json:"wrapped_pmk"`
+	WrapNonce          []byte    `json:"wrap_nonce"`
+	EphemeralPublicKey []byte    `json:"ephemeral_public_key"`
+}
+
+func GetProject(projectName string, userId uuid.UUID) (*cryptutils.WrappedKey, *uuid.UUID, error) {
+	var requestBody GetUserProjectRequest = GetUserProjectRequest{
+		ProjectName: projectName,
+		UserId:      userId,
+	}
+	requestBodyBytes, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	resp, err := http.Post("http://localhost:8080/projects/keys", "application/json", bytes.NewBuffer(requestBodyBytes))
+	if err != nil {
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	log.Println(resp.StatusCode)
+
+	var responseBody GetUserProjectResponse
+	err = json.NewDecoder(resp.Body).Decode(&responseBody)
+	if err != nil {
+		log.Println("ERROR in JSON decoding")
+		return nil, nil, err
+	}
+
+	log.Println("Wrapped keys:", responseBody.WrappedPMK)
+	log.Println("Project Id:", responseBody.ProjectId)
+
+	return &cryptutils.WrappedKey{
+		WrappedPMK:       responseBody.WrappedPMK,
+		WrapNonce:        responseBody.WrapNonce,
+		WrapEphemeralPub: responseBody.EphemeralPublicKey,
+	}, &responseBody.ProjectId, nil
 }
