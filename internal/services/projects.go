@@ -27,8 +27,6 @@ func CreateProject(name string, userId uuid.UUID, publicKey []byte) error {
 		return err
 	}
 
-	log.Print(pmk)
-
 	wrappedKey, err := cryptutils.WrapPMKForUser(pmk, publicKey)
 	if err != nil {
 		return err
@@ -41,8 +39,6 @@ func CreateProject(name string, userId uuid.UUID, publicKey []byte) error {
 		WrapNonce:          wrappedKey.WrapNonce,
 		EphemeralPublicKey: wrappedKey.WrapEphemeralPub,
 	}
-
-	log.Print(projectRequest)
 
 	requestBody, err := json.Marshal(projectRequest)
 	if err != nil {
@@ -85,17 +81,12 @@ func GetProject(projectName string, userId uuid.UUID) (*cryptutils.WrappedKey, *
 	}
 	defer resp.Body.Close()
 
-	log.Println(resp.StatusCode)
-
 	var responseBody GetUserProjectResponse
 	err = json.NewDecoder(resp.Body).Decode(&responseBody)
 	if err != nil {
 		log.Println("ERROR in JSON decoding")
 		return nil, nil, err
 	}
-
-	log.Println("Wrapped keys:", responseBody.WrappedPMK)
-	log.Println("Project Id:", responseBody.ProjectId)
 
 	return &cryptutils.WrappedKey{
 		WrappedPMK:       responseBody.WrappedPMK,

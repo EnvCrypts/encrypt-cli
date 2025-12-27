@@ -14,7 +14,6 @@ func main() {
 
 	keypair, userId, err := services.Login("vijay213@gmail.com", "vijayvenkatj")
 	if err != nil {
-
 		log.Fatal("Error Login:", err)
 	}
 
@@ -23,22 +22,29 @@ func main() {
 		log.Println("Error project creation", err.Error())
 	}
 
-	log.Println("User created", *userId)
-
 	wrappedKeys, projectId, err := services.GetProject("dummy5", *userId)
 	if err != nil {
 		log.Println("Error wrappedKey get", err.Error())
 	}
-	log.Println("Wrapped keys:", wrappedKeys)
 
 	err = services.PushEnv(*projectId, "vijay213@gmail.com", keypair.PrivateKey, wrappedKeys)
 	if err != nil {
 		log.Println("Error pushing env", err.Error())
 	}
 
+	err = services.UpdateEnv(*projectId, "vijay213@gmail.com", keypair.PrivateKey, wrappedKeys)
+	if err != nil {
+		log.Println("Error updating env", err.Error())
+	}
+
 	err = services.PullEnv(*projectId, "vijay213@gmail.com", keypair.PrivateKey, wrappedKeys)
 	if err != nil {
 		log.Println("Error pulling env", err.Error())
+	}
+
+	err = services.GetEnvVersions(*projectId, "vijay213@gmail.com", keypair.PrivateKey, wrappedKeys)
+	if err != nil {
+		log.Println("Error getting env versions", err.Error())
 	}
 
 }
