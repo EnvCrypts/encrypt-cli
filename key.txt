@@ -1,1 +1,4 @@
-­ANôcu·p÷ø÷Ä€VÁ¾¦+—’­@Zˆ˜)£˜"bÎ
+// testing
+DATABASE_URL="vijayvenjktj"
+WHAT_URL="CHATGOT"
+JET="NOTHING"

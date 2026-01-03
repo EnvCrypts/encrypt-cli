@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 
 	cryptutils "github.com/envcrypts/envcrypt_cli/internal/crypto"
 	"github.com/google/uuid"
@@ -23,7 +24,15 @@ type AddEnvRequest struct {
 func PushEnv(projectId uuid.UUID, email string, privateKey []byte, wrappedKey *cryptutils.WrappedKey) error {
 
 	// compress the file
-	data := []byte("Hello World This is a wiordasdfjkh")
+	fileData, err := os.ReadFile("/Users/vijayvenkatj/Projects/EnvCrypt-Cli/key.txt")
+	if err != nil {
+		return err
+	}
+
+	data, err := cryptutils.PrepareEnvForStorage(fileData)
+	if err != nil {
+		return err
+	}
 
 	pmk, err := cryptutils.UnwrapPMK(wrappedKey, privateKey)
 	if err != nil {
@@ -117,7 +126,14 @@ func PullEnv(projectId uuid.UUID, email string, privateKey []byte, wrappedKey *c
 		log.Println("not decrypt")
 	}
 
-	log.Println(string(decryptedData))
+	parsedEnv, err := cryptutils.ReadEnvFromStorage(decryptedData)
+	if err != nil {
+		return err
+	}
+
+	for k, v := range parsedEnv {
+		log.Println(k, v)
+	}
 
 	return nil
 }
@@ -136,7 +152,17 @@ type UpdateEnvResponse struct {
 }
 
 func UpdateEnv(projectId uuid.UUID, email string, privateKey []byte, wrappedKey *cryptutils.WrappedKey) error {
-	data := []byte("Hello World This is a wiordasdfjkh")
+
+	// compress the file
+	fileData, err := os.ReadFile("/Users/vijayvenkatj/Projects/EnvCrypt-Cli/key.txt")
+	if err != nil {
+		return err
+	}
+
+	data, err := cryptutils.PrepareEnvForStorage(fileData)
+	if err != nil {
+		return err
+	}
 
 	pmk, err := cryptutils.UnwrapPMK(wrappedKey, privateKey)
 	if err != nil {
@@ -238,7 +264,12 @@ func GetEnvVersions(projectId uuid.UUID, email string, privateKey []byte, wrappe
 			log.Println("not decrypt")
 		}
 
-		log.Printf("%d : %s", envVersion.Version, string(decryptedData))
+		readableData, err := cryptutils.ReadEnvFromStorage(decryptedData)
+		if err != nil {
+			log.Println("not readable")
+		}
+
+		log.Printf("%d : %s", envVersion.Version, readableData)
 	}
 
 	return nil
