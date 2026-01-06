@@ -1,4 +1,5 @@
-// testing
-DATABASE_URL="vijayvenjktj"
-WHAT_URL="CHATGOT"
-JET="NOTHING"
+#testing
+DATABASE_URL="vijayvenkatj"
+WHAT_URL="CHATGPT"
+JET="NOTHING_SPECIAL"
+ELSE="NEW"

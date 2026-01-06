@@ -18,7 +18,7 @@ func ParseEnv(data []byte) (map[string]string, error) {
 		line = strings.TrimSpace(line)
 
 		// Skip comments and empty lines
-		if line == "" || strings.HasPrefix(line, "#") {
+		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "//") {
 			continue
 		}
 
@@ -101,4 +101,32 @@ func ReadEnvFromStorage(data []byte) (map[string]string, error) {
 	}
 
 	return ParseEnv(decompressed)
+}
+
+type DiffingResult struct {
+	Added    []string `json:"added"`
+	Removed  []string `json:"removed"`
+	Modified []string `json:"modified"`
+}
+
+func DiffEnvVersions(oldVersion, newVersion map[string]string) DiffingResult {
+
+	var Added, Removed, Modified []string
+
+	for key, val := range newVersion {
+		if _, exists := oldVersion[key]; !exists {
+			Added = append(Added, key)
+		} else {
+			if val != oldVersion[key] {
+				Modified = append(Modified, key)
+			}
+		}
+	}
+	for key := range oldVersion {
+		if _, exists := newVersion[key]; !exists {
+			Removed = append(Removed, key)
+		}
+	}
+
+	return DiffingResult{Added: Added, Removed: Removed, Modified: Modified}
 }

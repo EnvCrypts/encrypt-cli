@@ -24,7 +24,7 @@ type AddEnvRequest struct {
 func PushEnv(projectId uuid.UUID, email string, privateKey []byte, wrappedKey *cryptutils.WrappedKey) error {
 
 	// compress the file
-	fileData, err := os.ReadFile("/Users/vijayvenkatj/Projects/EnvCrypt-Cli/key.txt")
+	fileData, err := os.ReadFile("/home/vijay/Projects/encrypt-cli/key.txt")
 	if err != nil {
 		return err
 	}
@@ -90,22 +90,22 @@ type GetEnvResponse struct {
 	Nonce      []byte `json:"nonce"`
 }
 
-func PullEnv(projectId uuid.UUID, email string, privateKey []byte, wrappedKey *cryptutils.WrappedKey) error {
+func PullEnv(projectId uuid.UUID, email string, privateKey []byte, version int32, wrappedKey *cryptutils.WrappedKey) (map[string]string, error) {
 
 	var requestBody GetEnvRequest = GetEnvRequest{
 		ProjectId: projectId,
 		Email:     email,
 		EnvName:   "Testing",
-		Version:   2,
+		Version:   version,
 	}
 	requestBodyBytes, err := json.Marshal(requestBody)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	resp, err := http.Post("http://localhost:8080/env/search", "application/json", bytes.NewBuffer(requestBodyBytes))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
@@ -118,7 +118,7 @@ func PullEnv(projectId uuid.UUID, email string, privateKey []byte, wrappedKey *c
 	pmk, err := cryptutils.UnwrapPMK(wrappedKey, privateKey)
 	if err != nil {
 		log.Println("Pmk not unwrapped")
-		return err
+		return nil, err
 	}
 
 	decryptedData, err := cryptutils.DecryptENV(pmk, responseBody.CipherText, responseBody.Nonce)
@@ -128,14 +128,14 @@ func PullEnv(projectId uuid.UUID, email string, privateKey []byte, wrappedKey *c
 
 	parsedEnv, err := cryptutils.ReadEnvFromStorage(decryptedData)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for k, v := range parsedEnv {
 		log.Println(k, v)
 	}
 
-	return nil
+	return parsedEnv, nil
 }
 
 type UpdateEnvRequest struct {
@@ -154,7 +154,7 @@ type UpdateEnvResponse struct {
 func UpdateEnv(projectId uuid.UUID, email string, privateKey []byte, wrappedKey *cryptutils.WrappedKey) error {
 
 	// compress the file
-	fileData, err := os.ReadFile("/Users/vijayvenkatj/Projects/EnvCrypt-Cli/key.txt")
+	fileData, err := os.ReadFile("/home/vijay/Projects/encrypt-cli/key.txt")
 	if err != nil {
 		return err
 	}
@@ -272,6 +272,58 @@ func GetEnvVersions(projectId uuid.UUID, email string, privateKey []byte, wrappe
 		log.Printf("%d : %s", envVersion.Version, readableData)
 	}
 
+	if len(responseBody.EnvVersions) > 2 {
+
+		type ReadableData struct {
+			oldVersion map[string]string
+			newVersion map[string]string
+		}
+
+		var readableData ReadableData
+
+		for i := len(responseBody.EnvVersions) - 2; i < len(responseBody.EnvVersions); i++ {
+
+			envVersion := responseBody.EnvVersions[i]
+
+			decryptedData, err := cryptutils.DecryptENV(pmk, envVersion.CipherText, envVersion.Nonce)
+			if err != nil {
+				log.Println("not decrypt")
+			}
+
+			data, err := cryptutils.ReadEnvFromStorage(decryptedData)
+			if err != nil {
+				log.Println("not readable")
+			}
+
+			if i == 0 {
+				readableData.oldVersion = data
+			} else {
+				readableData.newVersion = data
+			}
+		}
+
+		_ = cryptutils.DiffEnvVersions(readableData.oldVersion, readableData.newVersion)
+	}
+
 	return nil
 
+}
+
+func DiffENVVersions(projectId uuid.UUID, email string, privateKey []byte, wrappedKey *cryptutils.WrappedKey, oldVersion, newVersion int32) error {
+
+	oldVersionEnv, err := PullEnv(projectId, email, privateKey, oldVersion, wrappedKey)
+	if err != nil {
+		return err
+	}
+	newVersionEnv, err := PullEnv(projectId, email, privateKey, newVersion, wrappedKey)
+	if err != nil {
+		return err
+	}
+
+	diffingResult := cryptutils.DiffEnvVersions(oldVersionEnv, newVersionEnv)
+	log.Println("ADDED", diffingResult.Added)
+	log.Println("Modified", diffingResult.Modified)
+	log.Println("Removed", diffingResult.Removed)
+
+	return nil
 }
