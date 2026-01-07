@@ -27,25 +27,28 @@ func main() {
 		log.Println("Error wrappedKey get", err.Error())
 	}
 
-	err = services.PushEnv(*projectId, "vijayvenkaj@gmail.com", keypair.PrivateKey, wrappedKeys)
-	if err != nil {
-		log.Println("Error pushing env", err.Error())
-	}
-
+	//err = services.PushEnv(*projectId, "vijayvenkaj@gmail.com", keypair.PrivateKey, wrappedKeys)
+	//if err != nil {
+	//	log.Println("Error pushing env", err.Error())
+	//}
+	////
 	err = services.UpdateEnv(*projectId, "vijayvenkaj@gmail.com", keypair.PrivateKey, wrappedKeys)
 	if err != nil {
 		log.Println("Error updating env", err.Error())
 	}
 
-	_, err = services.PullEnv(*projectId, "vijayvenkaj@gmail.com", keypair.PrivateKey, 5, wrappedKeys)
+	//_, err = services.PullEnv(*projectId, "vijayvenkaj@gmail.com", keypair.PrivateKey, 5, wrappedKeys)
+	//if err != nil {
+	//	log.Println("Error pulling env", err.Error())
+	//}
+	//
+	//err = services.DiffENVVersions(*projectId, "vijayvenkaj@gmail.com", keypair.PrivateKey, wrappedKeys, 1, 3)
+
+	err = services.RollbackEnv(*projectId, "vijayvenkaj@gmail.com", keypair.PrivateKey, 1, wrappedKeys)
+
+	err = services.GetEnvVersions(*projectId, "vijayvenkaj@gmail.com", keypair.PrivateKey, wrappedKeys)
 	if err != nil {
-		log.Println("Error pulling env", err.Error())
+		log.Println("Error getting env versions", err.Error())
 	}
 
-	//err = services.GetEnvVersions(*projectId, "vijayvenkaj@gmail.com", keypair.PrivateKey, wrappedKeys)
-	//if err != nil {
-	//	log.Println("Error getting env versions", err.Error())
-	//}
-
-	err = services.DiffENVVersions(*projectId, "vijayvenkaj@gmail.com", keypair.PrivateKey, wrappedKeys, 1, 3)
 }

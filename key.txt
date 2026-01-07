@@ -1,5 +1,4 @@
 #testing
-DATABASE_URL="vijayvenkatj"
+DATABASE_URL="vijayvenkatj_thisfortesting"
 WHAT_URL="CHATGPT"
 JET="NOTHING_SPECIAL"
-ELSE="NEW"

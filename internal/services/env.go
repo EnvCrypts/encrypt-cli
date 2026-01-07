@@ -12,6 +12,9 @@ import (
 	"github.com/google/uuid"
 )
 
+type Metadata struct {
+	Type string `json:"type"`
+}
 type AddEnvRequest struct {
 	ProjectId uuid.UUID `json:"project_id"`
 	Email     string    `json:"user_email"`
@@ -19,6 +22,8 @@ type AddEnvRequest struct {
 	EnvName    string `json:"env_name"`
 	CipherText []byte `json:"cipher_text"`
 	Nonce      []byte `json:"nonce"`
+
+	Metadata Metadata `json:"metadata"`
 }
 
 func PushEnv(projectId uuid.UUID, email string, privateKey []byte, wrappedKey *cryptutils.WrappedKey) error {
@@ -47,12 +52,17 @@ func PushEnv(projectId uuid.UUID, email string, privateKey []byte, wrappedKey *c
 		return err
 	}
 
+	metadata := Metadata{
+		Type: "env_created",
+	}
+
 	var AddEnvRequest AddEnvRequest = AddEnvRequest{
 		ProjectId:  projectId,
 		Email:      email,
 		EnvName:    "Testing",
 		CipherText: encryptedData,
 		Nonce:      nonce,
+		Metadata:   metadata,
 	}
 	requestBody, err := json.Marshal(AddEnvRequest)
 	if err != nil {
@@ -145,6 +155,8 @@ type UpdateEnvRequest struct {
 	EnvName    string `json:"env_name"`
 	CipherText []byte `json:"cipher_text"`
 	Nonce      []byte `json:"nonce"`
+
+	Metadata Metadata `json:"metadata"`
 }
 
 type UpdateEnvResponse struct {
@@ -177,12 +189,16 @@ func UpdateEnv(projectId uuid.UUID, email string, privateKey []byte, wrappedKey 
 		return err
 	}
 
+	metadata := Metadata{
+		Type: "env_updated",
+	}
 	var updateEnvRequest UpdateEnvRequest = UpdateEnvRequest{
 		ProjectId:  projectId,
 		Email:      email,
 		EnvName:    "Testing",
 		CipherText: encryptedData,
 		Nonce:      nonce,
+		Metadata:   metadata,
 	}
 	requestBody, err := json.Marshal(updateEnvRequest)
 	if err != nil {
@@ -213,9 +229,10 @@ type GetEnvVersionsRequest struct {
 }
 
 type EnvResponse struct {
-	CipherText []byte `json:"cipher_text"`
-	Nonce      []byte `json:"nonce"`
-	Version    int32  `json:"version"`
+	CipherText []byte   `json:"cipher_text"`
+	Nonce      []byte   `json:"nonce"`
+	Version    int32    `json:"version"`
+	Metadata   Metadata `json:"metadata"`
 }
 type GetEnvVersionsResponse struct {
 	EnvVersions []EnvResponse `json:"env_versions"`
@@ -269,44 +286,10 @@ func GetEnvVersions(projectId uuid.UUID, email string, privateKey []byte, wrappe
 			log.Println("not readable")
 		}
 
-		log.Printf("%d : %s", envVersion.Version, readableData)
-	}
-
-	if len(responseBody.EnvVersions) > 2 {
-
-		type ReadableData struct {
-			oldVersion map[string]string
-			newVersion map[string]string
-		}
-
-		var readableData ReadableData
-
-		for i := len(responseBody.EnvVersions) - 2; i < len(responseBody.EnvVersions); i++ {
-
-			envVersion := responseBody.EnvVersions[i]
-
-			decryptedData, err := cryptutils.DecryptENV(pmk, envVersion.CipherText, envVersion.Nonce)
-			if err != nil {
-				log.Println("not decrypt")
-			}
-
-			data, err := cryptutils.ReadEnvFromStorage(decryptedData)
-			if err != nil {
-				log.Println("not readable")
-			}
-
-			if i == 0 {
-				readableData.oldVersion = data
-			} else {
-				readableData.newVersion = data
-			}
-		}
-
-		_ = cryptutils.DiffEnvVersions(readableData.oldVersion, readableData.newVersion)
+		log.Printf("%d : %s -> %v", envVersion.Version, readableData, envVersion.Metadata)
 	}
 
 	return nil
-
 }
 
 func DiffENVVersions(projectId uuid.UUID, email string, privateKey []byte, wrappedKey *cryptutils.WrappedKey, oldVersion, newVersion int32) error {
@@ -324,6 +307,76 @@ func DiffENVVersions(projectId uuid.UUID, email string, privateKey []byte, wrapp
 	log.Println("ADDED", diffingResult.Added)
 	log.Println("Modified", diffingResult.Modified)
 	log.Println("Removed", diffingResult.Removed)
+
+	return nil
+}
+
+func PushRollbackEnv(projectId uuid.UUID, email string, privateKey []byte, env map[string]string, wrappedKey *cryptutils.WrappedKey) error {
+
+	// prepare the env
+	data, err := cryptutils.PrepareEnvForRollback(env)
+	if err != nil {
+		return err
+	}
+
+	pmk, err := cryptutils.UnwrapPMK(wrappedKey, privateKey)
+	if err != nil {
+		log.Println("Pmk not unwrapped")
+		return err
+	}
+
+	// encrypt using pmk and store the nonce, ciphertext
+	encryptedData, nonce, err := cryptutils.EncryptENV(pmk, data)
+	if err != nil {
+		log.Println("not encruypt")
+		return err
+	}
+
+	metadata := Metadata{
+		Type: "env_rollback",
+	}
+
+	var AddEnvRequest AddEnvRequest = AddEnvRequest{
+		ProjectId:  projectId,
+		Email:      email,
+		EnvName:    "Testing",
+		CipherText: encryptedData,
+		Nonce:      nonce,
+		Metadata:   metadata,
+	}
+	requestBody, err := json.Marshal(AddEnvRequest)
+	if err != nil {
+		return err
+	}
+
+	// send to server
+	resp, err := http.Post("http://localhost:8080/env/create", "application/json", bytes.NewBuffer(requestBody))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		body, _ := ioutil.ReadAll(resp.Body)
+		log.Println(string(body))
+		return nil
+	}
+
+	log.Println(resp.Body)
+
+	return nil
+}
+func RollbackEnv(projectId uuid.UUID, email string, privateKey []byte, version int32, wrappedKey *cryptutils.WrappedKey) error {
+
+	updationEnv, err := PullEnv(projectId, email, privateKey, version, wrappedKey)
+	if err != nil {
+		return err
+	}
+
+	err = PushRollbackEnv(projectId, email, privateKey, updationEnv, wrappedKey)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

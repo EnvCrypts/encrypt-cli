@@ -94,6 +94,17 @@ func PrepareEnvForStorage(raw []byte) ([]byte, error) {
 	return compressed, nil
 }
 
+func PrepareEnvForRollback(env map[string]string) ([]byte, error) {
+	normalized := NormalizeEnv(env)
+
+	compressed, err := CompressEnv(normalized)
+	if err != nil {
+		return nil, err
+	}
+
+	return compressed, nil
+}
+
 func ReadEnvFromStorage(data []byte) (map[string]string, error) {
 	decompressed, err := DecompressEnv(data)
 	if err != nil {
